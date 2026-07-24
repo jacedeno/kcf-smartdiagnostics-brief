@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>KCF SMARTdiagnostics — Platform Teardown &amp; Benchmark</title>
+<style>
+  :root {
+    --ink: #1a2230;
+    --muted: #5a6675;
+    --paper: #f7f8fa;
+    --card: #ffffff;
+    --line: #e2e6ec;
+    --blue: #0070c4;        /* KCF chart blue */
+    --blue-deep: #044a86;
+    --blue-soft: #e9f2fb;
+    --slate: #23304a;
+    --amber: #b3600e;
+    --amber-soft: #fbf1e3;
+    --red: #c0392b;
+    --red-soft: #fbecea;
+    --green: #1f7a34;
+    --green-soft: #e9f5ec;
+    --code-bg: #0f1728;
+    --code-ink: #d7e3f4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e8edf5; --muted: #9aa7b8; --paper: #0c1220; --card: #141d2e;
+      --line: #26324a; --blue: #4aa3e8; --blue-deep: #7cc0f2; --blue-soft: #12233a;
+      --slate: #c3d0e4; --amber: #e0a24a; --amber-soft: #2a2113; --red: #e57365;
+      --red-soft: #2c1512; --green: #5fbf78; --green-soft: #12281a;
+      --code-bg: #0a1120; --code-ink: #cdddf2;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #e8edf5; --muted: #9aa7b8; --paper: #0c1220; --card: #141d2e;
+    --line: #26324a; --blue: #4aa3e8; --blue-deep: #7cc0f2; --blue-soft: #12233a;
+    --slate: #c3d0e4; --amber: #e0a24a; --amber-soft: #2a2113; --red: #e57365;
+    --red-soft: #2c1512; --green: #5fbf78; --green-soft: #12281a;
+    --code-bg: #0a1120; --code-ink: #cdddf2;
+  }
+  :root[data-theme="light"] {
+    --ink: #1a2230; --muted: #5a6675; --paper: #f7f8fa; --card: #ffffff;
+    --line: #e2e6ec; --blue: #0070c4; --blue-deep: #044a86; --blue-soft: #e9f2fb;
+    --slate: #23304a; --amber: #b3600e; --amber-soft: #fbf1e3; --red: #c0392b;
+    --red-soft: #fbecea; --green: #1f7a34; --green-soft: #e9f5ec;
+    --code-bg: #0f1728; --code-ink: #d7e3f4;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+    background: var(--paper); color: var(--ink); line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  section { max-width: 1000px; margin: 0 auto; padding: 68px 28px; border-bottom: 1px solid var(--line); }
+  .kicker { font-size: 12px; font-weight: 700; letter-spacing: 2.4px; text-transform: uppercase; color: var(--blue); margin-bottom: 12px; }
+  h1 { font-size: clamp(30px, 5.4vw, 54px); line-height: 1.1; letter-spacing: -0.6px; }
+  h2 { font-size: clamp(24px, 3.8vw, 36px); line-height: 1.16; margin-bottom: 16px; letter-spacing: -0.4px; }
+  h3 { font-size: 18px; margin-bottom: 6px; letter-spacing: -0.2px; }
+  h4 { font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin: 30px 0 10px; }
+  p { margin-top: 12px; }
+  p.lead { font-size: 19px; color: var(--muted); max-width: 66ch; margin-top: 0; }
+  .muted { color: var(--muted); }
+  a { color: var(--blue); }
+
+  figure { margin: 26px 0 6px; }
+  img.full { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); box-shadow: 0 6px 22px rgba(20,30,50,.10); background: var(--card); display: block; }
+  figcaption { font-size: 13px; color: var(--muted); margin-top: 10px; padding-left: 2px; }
+  figcaption b { color: var(--ink); font-weight: 700; }
+
+  /* hero */
+  .hero { max-width: 1000px; margin: 0 auto; padding: 96px 28px 76px; border-bottom: 4px solid var(--blue); }
+  .hero p.lead { margin-top: 22px; }
+  .badgerow { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+  .badge { font-size: 12.5px; font-weight: 600; padding: 6px 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--muted); }
+  .badge b { color: var(--blue); }
+
+  /* stat row */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-top: 30px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .stat .n { font-size: 28px; font-weight: 800; color: var(--blue); letter-spacing: -0.5px; }
+  .stat .l { font-size: 13px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+
+  /* cards */
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 22px; }
+  .card .tag { font-size: 11px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--blue); }
+  .card h3 { margin-top: 6px; }
+  .card p { font-size: 14.5px; color: var(--muted); margin-top: 8px; }
+
+  .feature { margin-top: 44px; }
+  .feature:first-of-type { margin-top: 30px; }
+  .feature .fh { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .feature .num { font-size: 14px; font-weight: 800; color: var(--blue); background: var(--blue-soft); border-radius: 8px; padding: 3px 11px; letter-spacing: .5px; }
+  .feature p { max-width: 74ch; }
+  ul.clean { margin: 14px 0 0; padding-left: 20px; }
+  ul.clean li { margin-bottom: 8px; color: var(--muted); font-size: 15px; }
+  ul.clean li b { color: var(--ink); }
+
+  /* callout */
+  .callout { border-left: 4px solid var(--blue); background: var(--blue-soft); padding: 20px 24px; border-radius: 0 12px 12px 0; margin-top: 26px; }
+  .callout .lbl { font-size: 12px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: var(--blue-deep); }
+  .callout h3 { margin-top: 6px; }
+  .callout p { font-size: 15px; color: var(--muted); }
+
+  /* tables */
+  .tablewrap { overflow-x: auto; margin-top: 22px; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-size: 14.5px; }
+  th, td { padding: 11px 15px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--blue-soft); color: var(--blue-deep); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
+  tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); }
+  code { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13px; background: var(--blue-soft); color: var(--blue-deep); padding: 1px 6px; border-radius: 5px; }
+
+  /* code / architecture block */
+  pre { margin-top: 22px; background: var(--code-bg); color: var(--code-ink); border-radius: 12px; padding: 22px; overflow-x: auto; font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.55; border: 1px solid var(--line); }
+
+  /* keep/drop/add */
+  .kda-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .pill { font-size: 12.5px; font-weight: 700; padding: 5px 13px; border-radius: 999px; }
+  .pill.keep { background: var(--green-soft); color: var(--green); }
+  .pill.drop { background: var(--red-soft); color: var(--red); }
+  .pill.add { background: var(--amber-soft); color: var(--amber); }
+  td .tagcell { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+  td .tagcell.keep { color: var(--green); }
+  td .tagcell.drop { color: var(--red); }
+  td .tagcell.add { color: var(--amber); }
+
+  .toc { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 26px; }
+  .toc a { display: block; padding: 14px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14.5px; }
+  .toc a span { display: block; font-weight: 400; font-size: 13px; color: var(--muted); margin-top: 3px; }
+  .toc a:hover { border-color: var(--blue); }
+
+  footer { max-width: 1000px; margin: 0 auto; text-align: left; padding: 54px 28px 80px; color: var(--muted); font-size: 14px; }
+  footer .name { font-size: 16px; font-weight: 700; color: var(--ink); }
+  .theme-toggle { position: fixed; top: 16px; right: 16px; z-index: 20; background: var(--card); border: 1px solid var(--line); color: var(--ink); border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 10px rgba(20,30,50,.12); }
+  .disclaimer { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 22px; margin-top: 22px; font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">◐ Theme</button>
+
+<!-- ========================= HERO ========================= -->
+<header class="hero">
+  <div class="kicker">Internal Benchmark Study · July 2026</div>
+  <h1>KCF SMARTdiagnostics<br>A Platform Teardown</h1>
+  <p class="lead">A field study of a mature industrial condition-monitoring SaaS — what it does well, how it is built, and which ideas are worth borrowing. Observed hands-on from a live production tenant, running release <b>4.52.3</b>.</p>
+
+  <div class="badgerow">
+    <span class="badge">Build <b>4.52.3</b></span>
+    <span class="badge">React <b>18.3.1</b> SPA</span>
+    <span class="badge"><b>ASP.NET Core</b> + AWS serverless</span>
+    <span class="badge"><b>AWS</b> us-east-1</span>
+    <span class="badge">Wireless vibration &amp; oil sensing</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">48</div><div class="l">Indicator types across 10 categories</div></div>
+    <div class="stat"><div class="n">7</div><div class="l">Levels in the flexible asset hierarchy</div></div>
+    <div class="stat"><div class="n">4</div><div class="l">Color themes (token-driven)</div></div>
+    <div class="stat"><div class="n">18+</div><div class="l">Feature flags gating a live v3→v4 migration</div></div>
+    <div class="stat"><div class="n">2</div><div class="l">AI assistants (KCFchat + new SD Pulse)</div></div>
+  </div>
+</header>
+
+<!-- ========================= EXECUTIVE SUMMARY ========================= -->
+<section id="summary">
+  <div class="kicker">Executive Summary</div>
+  <h2>What SMARTdiagnostics is, in one read</h2>
+  <p class="lead">SMARTdiagnostics is KCF Technologies' predictive-maintenance platform. Battery-powered wireless sensors stream vibration, temperature, pressure and oil-quality data through base stations to a cloud backend; a browser app turns that telemetry into machine-health issues, guided diagnostics, and quantified downtime savings.</p>
+
+  <p>The product is deliberately organized around three jobs — <b>get the right data</b>, <b>do the right analysis</b>, and <b>take the right action</b>. That framing shows up everywhere in the UI: a guided path that runs from a location Overview, into a deep vibration Workbench, into a Machine-Health Desk where issues become work, and out to Reports. It is a focused, opinionated tool rather than a generic dashboard builder, and that focus is its biggest strength.</p>
+
+  <p>Underneath, it is a modern single-page React application backed by a .NET (ASP.NET Core) API, hosted entirely on AWS. What makes it interesting as a benchmark is not any single feature but the <b>engineering maturity</b>: a clean design-token theming system, per-user preferences with on-the-fly unit conversion, a flexible typed asset tree, a strict Content-Security-Policy, and a feature-flag-driven migration from a .NET monolith toward AWS serverless that is visibly in progress.</p>
+
+  <div class="callout">
+    <div class="lbl">Newest in release 4.52 (July 2026)</div>
+    <h3>SD Pulse — an AI copilot moves into the diagnostic workflow</h3>
+    <p>The just-shipped 4.52 release introduces <b>SD Pulse</b> (beta), an AI assistant built directly into the Machine-Health Desk that investigates issues, surfaces likely root causes, and recommends next steps by combining asset details, indicator trends, issue history and maintenance records. The same release folds <b>Critical Alarms into the Draft-Issue workflow</b> and adds <b>Sensor Ship Date</b> for hardware lifecycle tracking. This is a clear signal of where the product is heading: from surfacing data to recommending decisions.</p>
+  </div>
+
+  <figure>
+    <img class="full" src="images/02-release-modal.png" alt="In-app release announcement for SMARTdiagnostics 4.52 introducing SD Pulse">
+    <figcaption><b>Fig 1 —</b> The in-app 4.52 release notice announcing SD Pulse, captured live in the tenant. Tenant identity is blurred throughout this report.</figcaption>
+  </figure>
+
+  <div class="toc">
+    <a href="#strengths">Part I — Platform Strengths<span>The five things it does well</span></a>
+    <a href="#technical">Part II — Technical Characteristics<span>Stack, cloud, security, roadmap</span></a>
+    <a href="#recommendations">Part III — Keep / Drop / Add<span>What we'd carry forward</span></a>
+  </div>
+</section>
+
+<!-- ========================= PART I — STRENGTHS ========================= -->
+<section id="strengths">
+  <div class="kicker">Part I</div>
+  <h2>Platform Strengths</h2>
+  <p class="lead">Where the product genuinely shines. Each strength below is paired with evidence captured from the running application.</p>
+
+  <!-- Strength 1 -->
+  <div class="feature">
+    <div class="fh"><span class="num">01</span><h3>A guided, job-focused workflow — not a blank dashboard</h3></div>
+    <p>The left navigation reads like a maintenance playbook: <b>Overview</b> (Summary, Dashboards, Maps) → <b>Workbench</b> → <b>Desk</b> (Machine Health, Hardware Health) → <b>Hardware</b> → <b>Settings</b> → <b>Reports</b>. The location Summary leads with the outcomes that matter to a plant — open issues, average days-to-close, downtime hours saved, and total dollar savings — and only then drops into detail. The tool is opinionated about the path a reliability engineer should take, which lowers the learning curve dramatically.</p>
+    <ul class="clean">
+      <li><b>Outcome-first metrics.</b> The header quantifies value (downtime hours saved, total savings), not just sensor counts.</li>
+      <li><b>Everything is one or two clicks from an alert.</b> "Assets with Alerts" links straight into the relevant Workbench trend.</li>
+    </ul>
+    <figure>
+      <img class="full" src="images/03-overview-summary.png" alt="Location overview summary with KPI tiles, issues list and assets-with-alerts panel">
+      <figcaption><b>Fig 2 —</b> The location Overview: value KPIs across the top, live issues on the left, and a direct "Assets with Alerts → Workbench" jump on the right.</figcaption>
+    </figure>
+    <figure>
+      <img class="full" src="images/08-desk-machine-health.png" alt="Machine Health Desk issue table with severity, priority, status, fault type and savings columns">
+      <figcaption><b>Fig 3 —</b> The Machine-Health Desk, where alerts become tracked issues with severity, priority, fault type, tasks and quantified savings — the "take the right action" pillar.</figcaption>
+    </figure>
+  </div>
+
+  <!-- Strength 2 -->
+  <div class="feature">
+    <div class="fh"><span class="num">02</span><h3>A genuinely deep vibration-analysis workbench</h3></div>
+    <p>This is the technical heart of the product and the hardest part to build well. The Workbench Trend view stacks three synchronized charts — a long-range <b>Time Series</b>, a <b>Frequency Spectrum</b> (FFT), and a <b>Time Domain</b> waveform — over the same asset and time window. A vibration-markers panel overlays the classic bearing-fault frequencies (<b>BPFO, BPFI, BSF, FTF</b>), gear-mesh (GMF) and line-frequency (2×LF) markers with live amplitude readouts, and the analyst can switch units between Hz, CPM and Orders. This is professional-grade diagnostic tooling rendered entirely in the browser as SVG (Recharts/D3), with heavy signal math offloaded to a small WebAssembly module.</p>
+    <ul class="clean">
+      <li><b>Three synchronized domains at once.</b> Trend, spectrum and waveform share selection and time range — the standard workflow for confirming a bearing fault.</li>
+      <li><b>Fault-frequency markers built in.</b> Bearing, gear-mesh and electrical markers are first-class, not something the user has to compute.</li>
+      <li><b>Exportable, shareable sessions.</b> The toolbar exposes export, a shareable session link, "Create Issue", and a hotkey reference.</li>
+    </ul>
+    <figure>
+      <img class="full" src="images/07-trend.png" alt="Workbench Trend view with synchronized time series, FFT spectrum and waveform plus bearing-fault vibration markers">
+      <figcaption><b>Fig 4 —</b> The Workbench Trend: synchronized Time Series, Frequency Spectrum and Time Domain plots with BPFO/BPFI/BSF/FTF/GMF/2×LF fault markers. The asset tree on the right is redacted.</figcaption>
+    </figure>
+  </div>
+
+  <!-- Strength 3 -->
+  <div class="feature">
+    <div class="fh"><span class="num">03</span><h3>A layered AI story — analytics, a help copilot, and now a diagnostic copilot</h3></div>
+    <p>KCF's AI shows up in three distinct layers, which is smart product design. <b>MachineIQ</b> is the ML layer that produces "Smart Indicators" — a 0–1 probability that a specific failure mode is developing, surfaced on the asset card and as its own color on the activity timeline. <b>KCFchat</b> is a RAG help assistant grounded in product documentation; it is honest about scope, explicitly stating it cannot read live tenant data. And as of 4.52, <b>SD Pulse</b> pushes AI into the actual diagnostic loop inside the Desk. Three assistants, three clearly separated jobs — documentation help, statistical prediction, and guided root-cause reasoning.</p>
+    <ul class="clean">
+      <li><b>MachineIQ — probability, not just thresholds.</b> Reports a 0–1 likelihood of an event, distinct from classic warning/alarm levels.</li>
+      <li><b>KCFchat — a bounded RAG bot.</b> Separate microservice (<code>api.sd.kcftech.com/v4/helpbot</code>), stateless, with thumbs-up/down feedback and an explicit "what I cannot see" disclaimer.</li>
+      <li><b>SD Pulse — the next step.</b> Combines trends, history and maintenance records to recommend actions, right where issues are worked.</li>
+    </ul>
+    <figure>
+      <img class="full" src="images/16-kcfchat-answer.png" alt="KCFchat AI assistant answering a product question with feedback and regenerate controls">
+      <figcaption><b>Fig 5 —</b> KCFchat answering a product question. Note the scoped RAG behavior, thumbs up/down feedback, and "Regenerate Response" — a well-bounded help copilot.</figcaption>
+    </figure>
+  </div>
+
+  <!-- Strength 4 -->
+  <div class="feature">
+    <div class="fh"><span class="num">04</span><h3>A rich, flexible data model that maps to how plants really look</h3></div>
+    <p>Assets are organized as a <b>typed, nestable tree</b> rather than fixed levels. A node's role is defined by its <code>TreeItemType</code> — System → Group → Assembly → Asset → MonitoringPoint → IndicatorGroup → Indicator — not by its depth, so one customer can model a plant as deeply or as flatly as reality demands without schema changes. On top of that sits an authoritative catalog of <b>48 indicator types across 10 categories</b> (acceleration, velocity, pressure, analog current/voltage, oil quality, and more), each with its own units and analytics. Small touches — a per-node <code>Abbreviation</code> for compact breadcrumbs, <code>IsPaused</code> to mute a subtree during maintenance, manual <code>SortOrder</code> to match physical layout — show a model designed by people who understand the domain.</p>
+    <ul class="clean">
+      <li><b>Type-driven, not depth-driven hierarchy.</b> The same generic node model flexes to any plant topology.</li>
+      <li><b>48 indicator types, 10 categories.</b> Including a newer <b>Oil Quality</b> modality (humidity, temperature) and statistical features (Kurtosis, Skewness, Crest Factor).</li>
+      <li><b>Aggregated health &amp; alert counts roll up the tree</b> so operators can see where to look first.</li>
+    </ul>
+    <figure>
+      <img class="full" src="images/18-indicators.png" alt="Indicator details table alongside the typed asset hierarchy tree and indicator-type filters">
+      <figcaption><b>Fig 6 —</b> The Indicators view: a per-asset indicator table beside the typed asset tree (redacted) and the indicator-type filter palette.</figcaption>
+    </figure>
+  </div>
+
+  <!-- Strength 5 -->
+  <div class="feature">
+    <div class="fh"><span class="num">05</span><h3>Product polish and a surrounding ecosystem</h3></div>
+    <p>The details are finished. Four color themes — Light, Dark, Navy and Night — are driven by CSS design tokens and a single <code>data-theme</code> attribute, with a live "Preview" before saving. Per-user preferences cover units (°C/°F, in/s ↔ mm/s, g ↔ mm/s², PSI/Pa/mbar), date/time format, time zone, role and interests, with conversion applied in the UI over canonical stored values. Around the core product sits a real ecosystem: a corporate <b>Deployment &amp; Value</b> dashboard, embedded <b>Power BI</b> support, hardware fleet management (base stations, sensors, repeaters, IoT hubs, piezo), scheduled and instant reports, a Maps view, and an <b>Academy</b> LMS for training.</p>
+    <div class="grid2">
+      <div class="card"><div class="tag">Theming</div><h3>Token-driven, 4 themes</h3><p>One semantic token set, re-skinned per theme via <code>data-theme</code>; text color in dark themes derived from the background with LCH for automatic contrast.</p></div>
+      <div class="card"><div class="tag">Preferences</div><h3>Per-user, canonical storage</h3><p>Units, formats, time zone and theme live on the user; the backend stores canonical values and the UI converts on the fly.</p></div>
+      <div class="card"><div class="tag">Value proof</div><h3>Deployment &amp; Value dashboard</h3><p>A native corporate rollup of deployment scope, value by type and asset coverage — the product sells its own ROI.</p></div>
+      <div class="card"><div class="tag">Fleet</div><h3>Full hardware management</h3><p>Base stations, sensors, repeaters, IoT hubs and piezo nodes with firmware versions and online status.</p></div>
+    </div>
+    <figure>
+      <img class="full" src="images/13-theme-navy.png" alt="User Profile Settings dialog shown in the Dark theme with unit and role preferences">
+      <figcaption><b>Fig 7 —</b> The User Profile Settings dialog in the Dark theme (live "Preview"), showing unit, date/time, role and appearance preferences.</figcaption>
+    </figure>
+    <figure>
+      <img class="full" src="images/09-hardware-overview.png" alt="Hardware overview listing base stations with firmware versions and online sensor counts">
+      <figcaption><b>Fig 8 —</b> Hardware overview: base stations with firmware versions and online-sensor counts, tabbed by device class. Customer-specific station name redacted.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ========================= PART II — TECHNICAL ========================= -->
+<section id="technical">
+  <div class="kicker">Part II</div>
+  <h2>Technical Characteristics</h2>
+  <p class="lead">How the platform is actually built — assembled from HTTP fingerprinting, JavaScript bundle inspection, and live network capture with a legitimate account. Nothing here required server access.</p>
+
+  <h4>Front end</h4>
+  <div class="tablewrap">
+  <table>
+    <tr><th>Layer</th><th>Technology</th><th>Notes</th></tr>
+    <tr><td><b>Framework</b></td><td>React 18.3.1 (SPA, PWA)</td><td>Webpack code-split bundles, content-hashed immutable assets</td></tr>
+    <tr><td><b>State / routing</b></td><td>Redux Toolkit · React Router</td><td>Axios for HTTP</td></tr>
+    <tr><td><b>Styling</b></td><td>styled-components 6 + CSS design tokens</td><td>Theming via <code>data-theme</code>; base font "REM"; Font Awesome 6 Pro</td></tr>
+    <tr><td><b>Charts</b></td><td>Recharts + D3 (SVG only)</td><td>No Canvas; heavy signal math in a ~20 KB WebAssembly module</td></tr>
+    <tr><td><b>Build tag</b></td><td><code>4.52.3</code></td><td>New version scheme (was <code>2.329.0_prod-io</code> a month earlier)</td></tr>
+  </table>
+  </div>
+
+  <h4>Back end &amp; cloud</h4>
+  <div class="tablewrap">
+  <table>
+    <tr><th>Layer</th><th>Technology</th><th>Evidence</th></tr>
+    <tr><td><b>CDN / edge</b></td><td>AWS CloudFront</td><td><code>server: CloudFront</code>, <code>x-amz-cf-*</code> headers</td></tr>
+    <tr><td><b>Static hosting</b></td><td>AWS S3</td><td><code>x-amz-version-id</code>, cache 15 min</td></tr>
+    <tr><td><b>Primary API</b></td><td>ASP.NET Core / Kestrel (.NET)</td><td><code>server: Kestrel</code> on <code>/api/v3.0/*</code>; OData-style filters</td></tr>
+    <tr><td><b>Secondary API (v4)</b></td><td>AWS API Gateway → Lambda</td><td><code>api.sd.kcftech.com/v4/*</code>; hosts the AI helpbot &amp; v4 sensors</td></tr>
+    <tr><td><b>Identity</b></td><td>AWS Cognito + Amplify</td><td>Bearer tokens (~1 h), pluggable provider discovery by email → SSO-ready</td></tr>
+    <tr><td><b>Region</b></td><td>AWS us-east-1</td><td>Cognito, Sentry ingest, CloudFront edge</td></tr>
+  </table>
+  </div>
+
+  <h4>Third-party services</h4>
+  <div class="tablewrap">
+  <table>
+    <tr><th>Service</th><th>Role</th></tr>
+    <tr><td><b>Sentry</b> (@sentry/react 10.39)</td><td>Front-end error tracking</td></tr>
+    <tr><td><b>ConfigCat</b></td><td>Feature flags — the backbone of phased release &amp; migration</td></tr>
+    <tr><td><b>Pendo</b> (white-labeled)</td><td>Product analytics, in-app guides, Resource Center (dominates initial network volume)</td></tr>
+    <tr><td><b>Power BI Embedded</b></td><td>Optional embedded BI dashboards</td></tr>
+    <tr><td><b>Academy LMS</b></td><td>User training (<code>academy.kcftech.com</code>)</td></tr>
+  </table>
+  </div>
+
+  <h4>Architecture at a glance</h4>
+  <pre>
+Browser — React 18.3.1 SPA (PWA)
+Redux Toolkit · React Router · Axios · styled-components 6 · Recharts/D3
+WASM (signal math) · Amplify/Cognito · Sentry · ConfigCat · Pendo · Power BI
+        │ static assets                        │ APIs (Cognito Bearer)
+        ▼                                       ▼
+┌──────────────────┐              ┌───────────────────────────────┐
+│ CloudFront + S3  │              │ CloudFront (API proxy)         │
+│ (js / css / wasm)│              │        ▼                       │
+└──────────────────┘              │  Kestrel / ASP.NET Core        │  ← API v3.0 (monolith, OData REST)
+                                  └──────────────┬─────────────────┘
+┌───────────────────────────────┐               │
+│ AWS API Gateway → Lambda       │ ← v4          ▼
+│ /v4/helpbot, /v4/*Sensors      │      Time-series DB + RDBMS (inferred)
+└───────────────────────────────┘               │  RF wireless
+                                   Base Stations → Repeaters → Sensors
+  </pre>
+
+  <h4>Security posture</h4>
+  <p>The front end ships a mature, strict Content-Security-Policy — <code>default-src 'none'</code> with a per-directive allowlist and hashed inline scripts — alongside HSTS (2-year preload), <code>X-Frame-Options: DENY</code>, <code>nosniff</code>, a strict referrer policy, and disabled geolocation/camera/microphone via Permissions-Policy. Multi-tenant scope is carried in <code>x-kcf-corp_id</code> / <code>x-kcf-location_id</code> headers rather than in URLs. No OpenAPI/Swagger spec is publicly exposed. This is a security baseline most SaaS products never reach.</p>
+
+  <h4>Roadmap signal — read from the feature flags</h4>
+  <p>The ~18 ConfigCat flags read like a roadmap. A phased <b>v3 → v4 migration</b> is clearly underway (<code>timeSeriesCutoverPhase1/2</code>, a family of <code>v4Sensors*</code> flags for enveloped data, low-frequency collection, smart-sampling, triggered capture and Z-axis), and AI is being woven into the issue workflow (<code>deskChatAutoreply</code>, <code>publishCriticalAlertsAsIssues</code>). Rather than rewriting the .NET monolith in one shot, KCF stands new capabilities up on AWS serverless and migrates domain-by-domain behind flags — a low-risk "strangler" migration.</p>
+
+  <figure>
+    <img class="full" src="images/01-login.png" alt="SMARTdiagnostics login screen, email-first Cognito flow">
+    <figcaption><b>Fig 9 —</b> The email-first login. Provider discovery by email address lets KCF add enterprise SSO per domain without touching the client.</figcaption>
+  </figure>
+</section>
+
+<!-- ========================= PART III — RECOMMENDATIONS ========================= -->
+<section id="recommendations">
+  <div class="kicker">Part III</div>
+  <h2>Conclusions &amp; Recommendations</h2>
+  <p class="lead">Reading SMARTdiagnostics as a benchmark: if we were building an industrial monitoring platform of our own, here is what we would keep, drop, and add.</p>
+
+  <p>SMARTdiagnostics is a strong, mature product with real engineering discipline. Its lessons are less about individual features and more about <b>architecture and product judgment</b>: an opinionated workflow beats a blank dashboard, a typed-flexible data model beats rigid levels, feature flags make big migrations survivable, and AI is most valuable when it is layered and scoped rather than bolted on. The recommendations below separate the patterns worth copying from the friction worth avoiding.</p>
+
+  <div class="kda-legend">
+    <span class="pill keep">KEEP — patterns to carry forward</span>
+    <span class="pill drop">DROP — friction to avoid</span>
+    <span class="pill add">ADD — where we'd go further</span>
+  </div>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Verdict</th><th>Item</th><th>Rationale</th></tr>
+
+    <tr><td><span class="tagcell keep">Keep</span></td><td><b>Design-token theming via <code>data-theme</code></b></td><td>One semantic token set re-skinned per theme, with dark-theme text derived from the background via LCH. Clean, cheap, and gives Light/Dark/Navy/Night for almost free.</td></tr>
+    <tr><td><span class="tagcell keep">Keep</span></td><td><b>Typed, nestable asset tree</b></td><td>A generic <code>TreeItem { type, abbreviation, isPaused, sortOrder, children }</code> flexes to any plant topology without schema migrations. Best-in-class data modeling.</td></tr>
+    <tr><td><span class="tagcell keep">Keep</span></td><td><b>Per-user preferences + canonical storage</b></td><td>Store SI/canonical values; convert units and formats in the presentation layer. The right way to serve a global user base.</td></tr>
+    <tr><td><span class="tagcell keep">Keep</span></td><td><b>Feature flags as the release backbone</b></td><td>Phased cutovers and edge-first monolith→serverless migration behind flags is the single most reusable lesson here.</td></tr>
+    <tr><td><span class="tagcell keep">Keep</span></td><td><b>Strict CSP + tenant-scope headers</b></td><td><code>default-src 'none'</code> with hashed inline scripts, and multi-tenant scope in headers not URLs. Mature and inexpensive to copy.</td></tr>
+    <tr><td><span class="tagcell keep">Keep</span></td><td><b>Outcome-first, guided workflow</b></td><td>Leading with downtime-saved and dollar-value, and guiding users Overview→Workbench→Desk→Reports, lowers the learning curve.</td></tr>
+
+    <tr><td><span class="tagcell drop">Drop</span></td><td><b>Heavy Pendo footprint on first load</b></td><td>Product analytics/guides dominate initial network requests. Worth adopting the capability, but lazy-load it — don't let it tax time-to-interactive.</td></tr>
+    <tr><td><span class="tagcell drop">Drop</span></td><td><b>Residual default Swagger UI asset</b></td><td>A leftover petstore Swagger page is served (harmless, but noise). Ship clean; remove default scaffolding.</td></tr>
+    <tr><td><span class="tagcell drop">Drop</span></td><td><b>Two overlapping help/AI entry points</b></td><td>KCFchat (docs) and SD Pulse (diagnostics) risk confusing users. Consolidate into one assistant that routes by intent.</td></tr>
+    <tr><td><span class="tagcell drop">Drop</span></td><td><b>~1 h token with in-session expiry friction</b></td><td>Short Cognito tokens are fine, but silent refresh must be seamless so long analysis sessions never interrupt.</td></tr>
+
+    <tr><td><span class="tagcell add">Add</span></td><td><b>AI with read access to live tenant data</b></td><td>KCFchat explicitly can't see live data. An assistant that combines RAG docs with tool-calling over the telemetry API ("which assets are in alarm and why?") would be a real differentiator — and SD Pulse is the first step toward it.</td></tr>
+    <tr><td><span class="tagcell add">Add</span></td><td><b>A public, versioned OpenAPI spec</b></td><td>No spec is exposed. A documented API accelerates integrations and partner ecosystems.</td></tr>
+    <tr><td><span class="tagcell add">Add</span></td><td><b>Real-time streaming to the client</b></td><td>Data is polled ("Updated 12:15 PM"). WebSocket/SSE push would make the Desk feel live — 4.52's "near real-time" note suggests they're already moving here.</td></tr>
+    <tr><td><span class="tagcell add">Add</span></td><td><b>Deeper CMMS / historian round-tripping</b></td><td>Issues reference maintenance records; a first-class bidirectional Maximo/SAP/historian sync would close the loop from detection to work order to verified savings.</td></tr>
+  </table>
+  </div>
+
+  <div class="callout">
+    <div class="lbl">Bottom line</div>
+    <h3>A benchmark worth studying, not just admiring</h3>
+    <p>The most transferable ideas are structural: a token-driven design system, a typed-flexible domain model, per-user canonical preferences, and a flag-gated strangler migration. The clearest opportunity the product hasn't fully seized — an AI copilot with live, tool-calling access to the customer's own data — is exactly where SD Pulse is now heading, and exactly where a new entrant could leapfrog.</p>
+  </div>
+</section>
+
+<!-- ========================= FOOTER ========================= -->
+<footer>
+  <div class="name">Method &amp; Disclaimer</div>
+  <div class="disclaimer">
+    <p style="margin-top:0">This is an independent, observational study performed with a legitimate user account on a live production tenant, running SMARTdiagnostics release <b>4.52.3</b> (captured July 24, 2026). Findings come only from client-side observation: HTTP header fingerprinting, JavaScript bundle inspection, and network capture in the browser. <b>No server, infrastructure, or other tenant's data was accessed, and nothing in the account was modified</b> (themes were tested in live "Preview" only, never saved).</p>
+    <p>All screenshots are redacted: customer names, asset and location names, and account identity are blurred; no authentication tokens, Cognito identifiers, or per-customer figures are shown. Vendor names appear only as publicly observable technology fingerprints, not as secrets. This document is a technical benchmark prepared for internal discussion and is not affiliated with or endorsed by KCF Technologies.</p>
+  </div>
+  <p class="muted" style="margin-top:22px">Prepared by Jose Cedeno · Internal benchmark study · July 2026</p>
+</footer>
+
+<script>
+  (function () {
+    var btn = document.getElementById('themeToggle');
+    var root = document.documentElement;
+    function apply(t){ root.setAttribute('data-theme', t); try { localStorage.setItem('kcfBriefTheme', t); } catch(e){} }
+    var saved; try { saved = localStorage.getItem('kcfBriefTheme'); } catch(e){}
+    if (saved) apply(saved);
+    btn.addEventListener('click', function () {
+      var cur = root.getAttribute('data-theme');
+      if (!cur) {
+        cur = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      apply(cur === 'dark' ? 'light' : 'dark');
+    });
+  })();
+</script>
+</body>
+</html>
